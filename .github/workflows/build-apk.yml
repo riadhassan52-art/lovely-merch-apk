@@ -1,0 +1,94 @@
+name: Build LoveLy Merch APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Unpack source archive if present
+        run: |
+          if [ -f "LoveLy-Merch-APK-src.zip" ]; then
+            unzip -o LoveLy-Merch-APK-src.zip
+            chmod -R u+w .
+            mkdir -p app/build
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Prepare release signing keystore
+        env:
+          SECRET_KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
+          SECRET_KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          SECRET_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SECRET_KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          KEYSTORE_PATH="${{ github.workspace }}/release.keystore"
+          if [ -n "$SECRET_KEYSTORE_B64" ]; then
+            echo "$SECRET_KEYSTORE_B64" | base64 -d > "$KEYSTORE_PATH"
+            echo "KEYSTORE_FILE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=$SECRET_KEYSTORE_PASS" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$SECRET_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$SECRET_KEY_PASS" >> "$GITHUB_ENV"
+          else
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -alias lovelymerch \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass lovelymerch123 \
+              -keypass lovelymerch123 \
+              -dname "CN=LoveLy Merch, OU=Mobile, O=LoveLy Merch, L=Dhaka, ST=Dhaka, C=BD"
+            echo "KEYSTORE_FILE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=lovelymerch123" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=lovelymerch" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=lovelymerch123" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build Signed Release APK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          gradle assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk LoveLy-Merch.apk
+          ls -lh LoveLy-Merch.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LoveLy-Merch-APK
+          path: LoveLy-Merch.apk
+          retention-days: 90
+
+      - name: Publish APK to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest LoveLy-Merch.apk --clobber
+          else
+            gh release create latest LoveLy-Merch.apk \
+              --title "LoveLy Merch APK (Latest)" \
+              --notes "Ready-to-install Android APK for https://merch.sadamata.com/dashboard. Tap **LoveLy-Merch.apk** below to download and install."
+          fi
