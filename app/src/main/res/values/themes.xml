@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.LoveLyMerch.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/brand_orange</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.LoveLyMerch</item>
+    </style>
+
+    <style name="Theme.LoveLyMerch" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand_orange</item>
+        <item name="colorPrimaryDark">#0A0E1A</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="android:statusBarColor">#0A0E1A</item>
+        <item name="android:navigationBarColor">#0A0E1A</item>
+        <item name="android:windowBackground">#0A0E1A</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
